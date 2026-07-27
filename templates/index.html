@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDimmer - macOS 肩膀動態感應螢幕暗化器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --accent-active: #10b981;
+            --accent-active-glow: rgba(16, 185, 129, 0.4);
+            --accent-dim: #ef4444;
+            --accent-dim-glow: rgba(239, 68, 68, 0.4);
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            font-size: 28px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1100px;
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 4 / 3;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .video-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid var(--accent-active);
+            color: var(--accent-active);
+            box-shadow: 0 0 20px var(--accent-active-glow);
+        }
+
+        .status-badge.paused {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--accent-dim);
+            color: var(--accent-dim);
+            box-shadow: 0 0 20px var(--accent-dim-glow);
+        }
+
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .metric-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: var(--text-sub);
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #3b82f6, #10b981);
+            border-radius: 6px;
+            transition: width 0.15s ease-out;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.15);
+            appearance: none;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+        }
+
+        .brightness-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .brightness-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f59e0b;
+        }
+
+        .guide-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #93c5fd;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">🏋️‍♂️</div>
+            <div>
+                <h1>FitDimmer</h1>
+                <div class="subtitle">macOS 肩膀動態感應螢幕調暗 App</div>
+            </div>
+        </div>
+        <button class="btn" onclick="restoreBrightness()">💡 復原最高亮度</button>
+    </header>
+
+    <div class="main-container">
+        <!-- 視訊與狀態顯示區 -->
+        <div class="card">
+            <div class="video-wrapper">
+                <img id="videoFeed" src="/video_feed" alt="Camera Feed">
+                <div id="statusBadge" class="status-badge active">
+                    <div class="pulse-dot"></div>
+                    <span id="statusText">偵測肩膀移動中</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 即時數據與控制面板 -->
+        <div class="card controls-panel">
+            <div class="brightness-display">
+                <div>
+                    <div style="font-size: 12px; color: var(--text-sub);">當前螢幕物理亮度</div>
+                    <div id="brightnessVal" class="brightness-value">100%</div>
+                </div>
+                <div style="font-size: 32px;">☀️</div>
+            </div>
+
+            <!-- 動能條 -->
+            <div class="metric-group">
+                <div class="metric-header">
+                    <span>肩膀上下移動振幅 (Y-Amp)</span>
+                    <span id="yAmpVal" class="metric-value">0.000</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="yAmpBar" class="progress-bar-fill"></div>
+                </div>
+            </div>
+
+            <div class="metric-group">
+                <div class="metric-header">
+                    <span>靜止時間 / 觸發倒數</span>
+                    <span id="idleTimeVal" class="metric-value">0.0s</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="idleBar" class="progress-bar-fill" style="background: linear-gradient(90deg, #10b981, #ef4444);"></div>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--card-border); margin: 4px 0;">
+
+            <!-- 設定控制 -->
+            <div class="control-item">
+                <div class="control-label">
+                    <span>靜止觸發時間 (Idle Timeout)</span>
+                    <span id="timeoutNum">2.5s</span>
+                </div>
+                <input type="range" id="timeoutSlider" min="1.0" max="10.0" step="0.5" value="2.5" oninput="updateSettings()">
+            </div>
+
+            <div class="control-item">
+                <div class="control-label">
+                    <span>肩膀移動靈敏度 (Sensitivity)</span>
+                    <span id="sensNum">0.030</span>
+                </div>
+                <input type="range" id="sensSlider" min="0.005" max="0.08" step="0.005" value="0.03" oninput="updateSettings()">
+            </div>
+
+            <div class="control-item">
+                <div class="control-label">
+                    <span>調暗速度 (Dim Duration)</span>
+                    <span id="dimDurNum">2.0s</span>
+                </div>
+                <input type="range" id="dimDurSlider" min="0.5" max="5.0" step="0.5" value="2.0" oninput="updateSettings()">
+            </div>
+
+            <div class="control-item">
+                <div class="control-label">
+                    <span>最低螢幕亮度 (Min Brightness)</span>
+                    <span id="minBNum">5%</span>
+                </div>
+                <input type="range" id="minBSlider" min="0.02" max="0.30" step="0.01" value="0.05" oninput="updateSettings()">
+            </div>
+
+            <div class="guide-box">
+                📌 <strong>使用指南：</strong> 請對準鏡頭，保持肩膀規律上下移動（如聳肩、熱身律動或深蹲）。當肩膀停止移動超過觸發時間，螢幕將漸進調暗。恢復肩膀移動即刻回亮。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        function initWebSocket() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                // 狀態 Badge
+                const badge = document.getElementById('statusBadge');
+                const statusText = document.getElementById('statusText');
+                if (data.is_active) {
+                    badge.className = 'status-badge active';
+                    statusText.innerText = '偵測肩膀移動中';
+                } else {
+                    badge.className = 'status-badge paused';
+                    statusText.innerText = `已靜止 (${data.idle_duration}s)`;
+                }
+
+                // 亮度與振幅
+                document.getElementById('brightnessVal').innerText = `${Math.round(data.current_brightness * 100)}%`;
+                document.getElementById('yAmpVal').innerText = data.y_range.toFixed(3);
+                
+                // 動能條
+                const yPct = Math.min(100, (data.y_range / (data.sensitivity * 2.0)) * 100);
+                document.getElementById('yAmpBar').style.width = `${yPct}%`;
+
+                // 靜止時間條
+                document.getElementById('idleTimeVal').innerText = `${data.idle_duration.toFixed(1)}s / ${data.idle_timeout}s`;
+                const idlePct = Math.min(100, (data.idle_duration / data.idle_timeout) * 100);
+                document.getElementById('idleBar').style.width = `${idlePct}%`;
+            };
+
+            ws.onclose = function() {
+                setTimeout(initWebSocket, 2000);
+            };
+        }
+
+        function updateSettings() {
+            const timeout = parseFloat(document.getElementById('timeoutSlider').value);
+            const sens = parseFloat(document.getElementById('sensSlider').value);
+            const dimDur = parseFloat(document.getElementById('dimDurSlider').value);
+            const minB = parseFloat(document.getElementById('minBSlider').value);
+
+            document.getElementById('timeoutNum').innerText = `${timeout.toFixed(1)}s`;
+            document.getElementById('sensNum').innerText = sens.toFixed(3);
+            document.getElementById('dimDurNum').innerText = `${dimDur.toFixed(1)}s`;
+            document.getElementById('minBNum').innerText = `${Math.round(minB * 100)}%`;
+
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    idle_timeout: timeout,
+                    sensitivity: sens,
+                    dim_duration: dimDur,
+                    min_brightness: minB
+                })
+            });
+        }
+
+        function restoreBrightness() {
+            fetch('/api/restore', { method: 'POST' });
+        }
+
+        window.onload = initWebSocket;
+    </script>
+</body>
+</html>

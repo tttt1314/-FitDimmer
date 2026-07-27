@@ -1,0 +1,5 @@
+.venv_fitdimmer/
+__pycache__/
+*.pyc
+.DS_Store
+pose_landmarker.task
