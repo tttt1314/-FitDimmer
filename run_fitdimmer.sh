@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+# 靜音 MediaPipe / GLog C++ 內部 Clearcut 遙測日誌
+export GLOG_minloglevel=3
+export MEDIAPIPE_DISABLE_TELEMETRY=1
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
 

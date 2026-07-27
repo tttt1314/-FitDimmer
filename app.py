@@ -1,3 +1,6 @@
+import os
+os.environ["GLOG_minloglevel"] = "3"
+
 import cv2
 import time
 import asyncio
