@@ -16,12 +16,12 @@ templates = Jinja2Templates(directory="templates")
 
 # 全域控制器
 brightness_ctrl = BrightnessController()
-detector = ShoulderMotionDetector(idle_timeout=2.5, sensitivity=0.012)
+detector = ShoulderMotionDetector(idle_timeout=2.5, sensitivity=0.020)
 
 # 設定參數
 class SettingsModel(BaseModel):
     idle_timeout: float = 2.5
-    sensitivity: float = 0.012
+    sensitivity: float = 0.020
     dim_duration: float = 2.0
     min_brightness: float = 0.05
 

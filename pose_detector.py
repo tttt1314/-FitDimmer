@@ -15,10 +15,10 @@ POSE_CONNECTIONS = [
 ]
 
 class ShoulderMotionDetector:
-    def __init__(self, idle_timeout=2.5, sensitivity=0.012):
+    def __init__(self, idle_timeout=2.5, sensitivity=0.020):
         """
         :param idle_timeout: 秒數，當肩膀靜止超過此時間，狀態轉為 PAUSED 並調暗螢幕
-        :param sensitivity: 肩膀上下擺動靈敏度門檻 (預設 0.012，即畫面高度 1.2%)
+        :param sensitivity: 平衡靈敏度門檻 (預設 0.020，濾除鏡頭噪點並抓取真實動作)
         """
         self.idle_timeout = idle_timeout
         self.sensitivity = sensitivity
@@ -39,10 +39,12 @@ class ShoulderMotionDetector:
         
         # 歷史軌跡 Buffer (45 幀 ~ 1.5 秒)
         self.y_history = deque(maxlen=45)
+        self.smoothed_y = None  # 指數平滑 EMA
+        
         self.last_motion_time = time.time()
         self.is_active = True
         self.current_y_range = 0.0
-        self.current_instant_speed = 0.0
+        self.direction_changes = 0
 
     def set_parameters(self, idle_timeout=None, sensitivity=None):
         if idle_timeout is not None:
@@ -52,7 +54,7 @@ class ShoulderMotionDetector:
 
     def process_frame(self, frame):
         """
-        精準追蹤肩膀 (Keypoint 11 & 12) 上下移動與即時動能
+        處理單張影像：採用 EMA 低通濾波器抑制鏡頭噪點 + 轉折點 (Peaks & Troughs) 規律移動判斷
         """
         h, w, _ = frame.shape
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -70,26 +72,36 @@ class ShoulderMotionDetector:
             r_shoulder = landmarks[12]
             
             if (0 <= l_shoulder.x <= 1) and (0 <= r_shoulder.x <= 1):
-                shoulder_y = (l_shoulder.y + r_shoulder.y) / 2.0
+                raw_y = (l_shoulder.y + r_shoulder.y) / 2.0
                 
-                # 計算即時幀間位移速度 (Instantaneous Speed)
-                if len(self.y_history) > 0:
-                    self.current_instant_speed = abs(shoulder_y - self.y_history[-1])
+                # 採用 EMA (Exponential Moving Average, alpha=0.35) 濾除攝影機鏡頭的高頻微小噪點
+                if self.smoothed_y is None:
+                    self.smoothed_y = raw_y
                 else:
-                    self.current_instant_speed = 0.0
+                    self.smoothed_y = 0.35 * raw_y + 0.65 * self.smoothed_y
                     
+                shoulder_y = self.smoothed_y
                 self.y_history.append(shoulder_y)
                 
-                # 計算短時間窗口內 Y 軸振幅 (Max Y - Min Y)
-                if len(self.y_history) >= 5:
+                # 分析滑動窗口內的肩膀上下擺動振幅與方向轉折點
+                if len(self.y_history) >= 8:
                     y_arr = np.array(self.y_history)
                     self.current_y_range = float(np.max(y_arr) - np.min(y_arr))
                     
-                    # 判定條件：
-                    # 1. 最近滑動窗口振幅大於等於靈敏度門檻 (current_y_range >= sensitivity)
-                    # 2. 或即時位移速度大於微幅門檻 (current_instant_speed >= sensitivity * 0.15)
-                    speed_thresh = max(0.001, self.sensitivity * 0.15)
-                    if self.current_y_range >= self.sensitivity or self.current_instant_speed >= speed_thresh:
+                    # 微分計算轉折點 (Peaks & Troughs)
+                    dy = np.diff(y_arr)
+                    # 忽略極微小的微速噪音 (thresholding noise)
+                    valid_dy = np.where(np.abs(dy) > 0.0008, dy, 0.0)
+                    
+                    if len(valid_dy) > 2:
+                        sign_changes = np.diff(np.sign(valid_dy))
+                        self.direction_changes = int(np.count_nonzero(sign_changes != 0))
+                    else:
+                        self.direction_changes = 0
+
+                    # 真正有效的運動判定：
+                    # 振幅高於門檻，且存在方向轉折（上下來回擺動）；或位移振幅明顯大於 1.3 倍門檻
+                    if (self.current_y_range >= self.sensitivity and self.direction_changes >= 1) or (self.current_y_range >= self.sensitivity * 1.35):
                         motion_detected = True
                         self.last_motion_time = now
 
@@ -137,7 +149,7 @@ class ShoulderMotionDetector:
             "is_active": self.is_active,
             "idle_duration": round(idle_duration if not self.is_active else 0.0, 2),
             "y_range": round(self.current_y_range, 4),
-            "speed": round(self.current_instant_speed, 4),
+            "direction_changes": self.direction_changes,
             "shoulder_detected": shoulder_y is not None
         }
         
