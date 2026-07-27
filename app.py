@@ -14,14 +14,14 @@ from brightness_controller import BrightnessController
 app = FastAPI(title="FitDimmer")
 templates = Jinja2Templates(directory="templates")
 
-# 核心全域控制器
+# 全域控制器
 brightness_ctrl = BrightnessController()
-detector = ShoulderMotionDetector(idle_timeout=2.5, sensitivity=0.03)
+detector = ShoulderMotionDetector(idle_timeout=2.5, sensitivity=0.012)
 
 # 設定參數
 class SettingsModel(BaseModel):
     idle_timeout: float = 2.5
-    sensitivity: float = 0.03
+    sensitivity: float = 0.012
     dim_duration: float = 2.0
     min_brightness: float = 0.05
 
